@@ -3,7 +3,6 @@
 # Script to install LPR VPN on CerboGX devices
 #
 # 20230428 JK: Version 1.00
-#
 
 #### following lines incorporate SetupHelper utilities into this script
 # Refer to the SetupHelper ReadMe file for details.
@@ -44,33 +43,30 @@ if [ $scriptAction == 'INSTALL' ] ; then
     /usr/bin/wget https://${SERVER}/${NUGGET}/${FILE}
     if [ $? -ne 0 ]
     then
-        echo "\nERROR: Could not transfer file, please investigate.\n"; exit 1
+        echo "ERROR: Could not transfer file, please investigate."; exit 1
     fi
 
     /bin/tar zxvf $TARGETHOME/$FILE -C /
     if [ $? -ne 0 ]
     then
-        echo "\nERROR: Could not extract file, please investigate.\n";  exit 2
+        echo "ERROR: Could not extract file, please investigate.";  exit 2
     fi
 
     /home/root/start_net.sh
     if [ $? -ne 0 ]
     then
-        echo "\nERROR: Could not start network, please investigate.\n"; exit 3
+        echo "ERROR: Could not start network, please investigate."; exit 3
     fi
 
-    echo "\nCompleted install of VPN on $TRAILER, network should be up on $IP\n"
+    echo "Completed install of VPN on $TRAILER, network should be up on VTemp"
 
-    sleep 60
-
-    # if some processing requires a reboot, set the flag then process it later
-    if $something ; then
-        rebootNeeded=true
-    fi
+    # set exit flags as needed
+    rebootNeeded=false
 fi
 
 # #### uninstalling - check scriptAction again
 # if an install step failed package needs to be removed
+
 if [ $scriptAction == 'UNINSTALL' ] ; then
     #### code to uninstall and deactivate package goes here
 
@@ -83,7 +79,7 @@ if [ $scriptAction == 'UNINSTALL' ] ; then
     fi
 
     echo Removing files
-    rm -rf /usr/local/etc/tinc /usr/local/sbin/tincd /usr/local/var/run /home/root/start_net.sh
+    rm -rf /usr/local/etc/tinc /usr/local/sbin/tincd /usr/local/var/run /home/root/start_net.sh $TARGETHOME/$FILE
 
     echo Removing startup command
     cp -p $RCS $RCS.temp
