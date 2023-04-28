@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# Script to install LPR VPN on CerboGX devices
+#
+# 20230428 JK: Version 1.00
+#
+
+#### following lines incorporate SetupHelper utilities into this script
+# Refer to the SetupHelper ReadMe file for details.
+
+source "/data/SetupHelper/CommonResources"
+
+# GitHub account info - fill in as appropriate
+# to include this package in SetupHelper automatic updates
+packageGitHubUser="tslewis"
+packageGitHubBranch="latest"
+
+#### end of lines to include SetupHelper
+
+#### running manually and OK to proceed - prompt for input
+if [ $scriptAction == 'NONE' ] ; then
+    # display innitial message
+    echo
+    echo "Install LPR VPN s/w and up on TEMP IP"
+
+    # prompt for standard actions (install, reinstall, uninstall, etc)
+    # next step is to install
+    scriptAction='INSTALL'
+fi
+
+#### install code goes here
+if [ $scriptAction == 'INSTALL' ] ; then
+
+    # GitHub based script to pull tarball down to Victron trailer
+    NUGGET=peewee
+    TRAILER=$(hostname)
+    SERVER=nagios.lightnin.net
+    SOURCEDIR=/home/tech/distro
+    TARGETHOME=/home/root
+    FILE=deploy_vpn_cerboGX.tgz
+
+    cd $TARGETHOME
+
+    /usr/bin/wget https://${SERVER}/${NUGGET}/${FILE}
+    if [ $? -ne 0 ]
+    then
+        echo "\nERROR: Could not transfer file, please investigate.\n"; exit 1
+    fi
+
+    /bin/tar zxvf $TARGETHOME/$FILE -C /
+    if [ $? -ne 0 ]
+    then
+        echo "\nERROR: Could not extract file, please investigate.\n";  exit 2
+    fi
+
+    /home/root/start_net.sh
+    if [ $? -ne 0 ]
+    then
+        echo "\nERROR: Could not start network, please investigate.\n"; exit 3
+    fi
+
+    echo "\nCompleted install of VPN on $TRAILER, network should be up on $IP\n"
+
+    sleep 60
+
+    # if some processing requires a reboot, set the flag then process it later
+    if $something ; then
+        rebootNeeded=true
+    fi
+fi
+
+# #### uninstalling - check scriptAction again
+# if an install step failed package needs to be removed
+if [ $scriptAction == 'UNINSTALL' ] ; then
+    #### code to uninstall and deactivate package goes here
+
+    RCS=/data/rcS.local
+    echo "Killing tinc process (if exists)"
+    PID=$(ps | grep tinc |grep -v grep | wc -l)
+    if [ $PID -gt 0 ]
+    then
+        kill $(ps | grep tinc |grep -v grep | awk '{ print $1}')
+    fi
+
+    echo Removing files
+    rm -rf /usr/local/etc/tinc /usr/local/sbin/tincd /usr/local/var/run /home/root/start_net.sh
+
+    echo Removing startup command
+    cp -p $RCS $RCS.temp
+    grep -v "start_net" $RCS.temp > $RCS
+    rm $RCS.temp
+
+    # set exit flags as needed
+    rebootNeeded=false
+fi
+
+
+#### add code to restart apps and services here
+# gui is handled in endScript so it's not necessary to restart it here
+if $restartAppsNeeded ; then
+    echo restarting apps
+    # killall foo # sample restart line(s)
+    # svc -t "/service/bar"
+fi
+
+# thats all folks - SCRIPT EXITS INSIDE THE FUNCTION
+endScript
