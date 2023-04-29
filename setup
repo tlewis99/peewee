@@ -79,7 +79,10 @@ if [ $scriptAction == 'UNINSTALL' ] ; then
     fi
 
     echo Removing files
-    rm -rf /usr/local/etc/tinc /usr/local/sbin/tincd /usr/local/var/run /home/root/start_net.sh $TARGETHOME/$FILE
+    rm -rf /usr/local/etc/tinc 
+    rm /usr/local/sbin/tincd 
+    rm /home/root/start_net.sh 
+    rm /home/root/$FILE
 
     echo Removing startup command
     cp -p $RCS $RCS.temp
@@ -88,15 +91,6 @@ if [ $scriptAction == 'UNINSTALL' ] ; then
 
     # set exit flags as needed
     rebootNeeded=false
-fi
-
-
-#### add code to restart apps and services here
-# gui is handled in endScript so it's not necessary to restart it here
-if $restartAppsNeeded ; then
-    echo restarting apps
-    # killall foo # sample restart line(s)
-    # svc -t "/service/bar"
 fi
 
 # thats all folks - SCRIPT EXITS INSIDE THE FUNCTION
