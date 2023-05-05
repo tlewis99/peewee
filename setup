@@ -24,7 +24,7 @@ echo_log()
 
 #### script specifics
 PROJ=PEEWEE
-VRM=$(ifconfig wifi0 |grep HWaddr | awk '{ print $5 }' | sed "s/://g" | tr '[A-Z]' '[a-z]')
+VRM=$(ifconfig wifi0 |grep HWaddr | awk '{ print $5 }' | sed "s/://g" | tr 'A-Z' 'a-z')
 SERVER=12.200.126.110
 UNAME=ziggy
 TARGETHOME=/data/home/${UNAME}
@@ -63,7 +63,7 @@ if [ "$scriptAction" == "INSTALL" ] ; then
 
     PROFILE=${TARGETHOME}/.profile 
     # Set some profile stuff (if not already set)
-    if [ $(grep ${PROJ} ${PROFILE} |wc -l) -eq 0 ]
+    if [ $(grep -c ${PROJ} ${PROFILE}) -eq 0 ]
     then
         echo                           	 >> ${PROFILE}
         echo "# Start ${PROJ} additions" >> ${PROFILE}
@@ -120,10 +120,10 @@ if [ "$scriptAction" == "UNINSTALL" ] ; then
     #### code to uninstall and deactivate package goes here
 
     echo "Killing tinc process (if exists)"
-    PID=$(ps | grep tinc |grep -v grep | wc -l)
-    if [ $PID -gt 0 ]
+    PID=$(ps |grep tincd |grep -v grep | awk '{ print $1}')
+    if [ "${PID}" != "" ]
     then
-        kill $(ps | grep tinc |grep -v grep | awk '{ print $1}')
+        kill ${PID}
     fi
 
     echo Removing files
