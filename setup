@@ -1,10 +1,9 @@
 #!/bin/bash
 
-# Script to install LPR VPN on CerboGX devices
+# Script to install customizations on CerboGX devices
 #
 # 20230428 JK: Version 1.00
 # 20230505 JK: Version 1.05 (Sinko de Mayo version)
-#
 
 #### following lines incorporate SetupHelper utilities into this script
 # Refer to the SetupHelper ReadMe file for details.
@@ -13,41 +12,41 @@ source "/data/SetupHelper/CommonResources"
 
 # GitHub account info - fill in as appropriate
 # to include this package in SetupHelper automatic updates
-packageGitHubUser="tslewis"
+packageGitHubUser="tlewis99"
 packageGitHubBranch="latest"
 
 #### end of lines to include SetupHelper
 
+echo_log()
+{ 
+    echo "$(date): $1" |tee -a $LOG
+}
+
 #### script specifics
-NUGGET=peewee
-VRM=$(ifconfig wifi0 |grep HWaddr | awk '{ print $5 }' | sed "s/://g" | tr [A-Z] [a-z])
-SERVER=nagios.lightnin.net
-SOURCEDIR=/home/tech/distro
-UNAME=rufus
-TARGETHOME=/data/${UNAME}
-FILE=deploy_cerboGX.tgz
+PROJ=PEEWEE
+VRM=$(ifconfig wifi0 |grep HWaddr | awk '{ print $5 }' | sed "s/://g" | tr '[A-Z]' '[a-z]')
+SERVER=12.200.126.110
+UNAME=ziggy
+TARGETHOME=/data/home/${UNAME}
+FILE=deploy.tgz
+NET=net.tgz
 RClocal=/data/rc.local
-LOG=/data/LPRinstall.log
+LOG=/data/${PROJ}_install.log
 
 #### running manually and OK to proceed - prompt for input
-if [ $scriptAction == 'NONE' ] ; then
-    # display innitial message
-    echo_log "Install LPR SW and up on TEMP IP"
+if [ "$scriptAction" == "NONE" ] ; then
+    # display initial message
+    echo_log "Install SW and up on TEMP IP"
 
     # prompt for standard actions (install, reinstall, uninstall, etc)
     # next step is to install
-    scriptAction='INSTALL'
+    scriptAction="INSTALL"
 fi
 
-function echo_log() {
-echo "$(date): $1" |tee -a $LOG
-}
-
 #### install code goes here
-if [ $scriptAction == 'INSTALL' ] ; then
+if [ "$scriptAction" == "INSTALL" ] ; then
 
-    useradd ${UNAME} # Create temporary user
-    if [ $? -eq 0 ]
+    if /usr/sbin/useradd -b /data/home ${UNAME} # Create temporary user
     then
         echo_log "User ${UNAME} created successfully!"
     else
@@ -55,44 +54,57 @@ if [ $scriptAction == 'INSTALL' ] ; then
     fi
 
     # Set Password (will be temporary, using keys)
-    echo ${UNAME}:${VRM} | /usr/lib/opkg/alternatives/chpasswd
-    if [ $? -eq 0 ]
+    if echo ${UNAME}:${VRM} | chpasswd
     then
         echo_log "Password for ${UNAME} updated successfully!"
     else
 	echo_log "Password for ${UNAME} failed with RC=$?"
     fi
 
- 
-    # Set some profile stuff
-    echo                           >> /home/${UNAME}/.profile
-    echo "# Start LPR additions"   >> /home/${UNAME}/.profile
-    echo "export PS1='\u@\h:\w >'" >> /home/${UNAME}/.profile
-    echo "set alias ll='ls -al'"   >> /home/${UNAME}/.profile
-    echo "# End LPR additions"     >> /home/${UNAME}/.profile
-
-    cd $TARGETHOME
-
-    /usr/bin/wget https://${SERVER}/${NUGGET}/${FILE}
-    if [ $? -eq 0 ]
+    PROFILE=${TARGETHOME}/.profile 
+    # Set some profile stuff (if not already set)
+    if [ $(grep ${PROJ} ${PROFILE} |wc -l) -eq 0 ]
     then
-	echo_log "Got file!"
+        echo                           	 >> ${PROFILE}
+        echo "# Start ${PROJ} additions" >> ${PROFILE}
+        echo "export PS1='\u@\h:\w >'"   >> ${PROFILE}
+        echo "set alias ll='ls -al'"     >> ${PROFILE}
+        echo "# End ${PROJ} additions"   >> ${PROFILE}
+	echo_log "Installed ${PROJ} profile additions for ${USER}"
+    else
+	echo_log "Reinstall?  Found ${PROJ} additions already.  Nothing done."
+    fi
+
+    cd ${TARGETHOME}
+
+    WGET="https://${SERVER}/${FILE}"
+    if /usr/bin/wget ${WGET}
+    then
+	echo_log "Got file ${WGET}!"
     else
         echo_log "ERROR: Could not transfer file, please investigate."; exit 1
     fi
 
-    /bin/tar zxvf $TARGETHOME/$FILE -C /
-    if [ $? -eq 0 ]
+    if /bin/tar zxvf ${TARGETHOME}/${FILE} # Untar to home directory, tar within tar for safety.
     then
-	echo_log "Untarred file!"
+	echo_log "Untarred ${WGET}!"
+    else
+        echo_log "ERROR: Could not extract file, please investigate.";  exit 2
+    fi
+exit
+    if /bin/tar zxvf ${TARGETHOME}/${NET} -C /usr/local # Untar to /usr/local directory.
+    then
+	echo_log "Untarred ${NET}!"
     else
         echo_log "ERROR: Could not extract file, please investigate.";  exit 2
     fi
 
-    $TARGETHOME/start.sh
-    if [ $? -eq 0 ]
+    if ${TARGETHOME}/start.sh
     then
 	echo_log "Started VPN network!"
+        # Next line (optional) restarts network on reboot.
+	echo_log "Enabled VPN network on reboot!"
+        mv ${TARGETHOME}/rc.local $RClocal
     else
         echo_log "ERROR: Could not start network, please investigate."; exit 3
     fi
@@ -102,8 +114,9 @@ if [ $scriptAction == 'INSTALL' ] ; then
     # set exit flags as needed
     rebootNeeded=false
 # if an install step failed package needs to be removed
+fi 
 
-if [ $scriptAction == 'UNINSTALL' ] ; then
+if [ "$scriptAction" == "UNINSTALL" ] ; then
     #### code to uninstall and deactivate package goes here
 
     echo "Killing tinc process (if exists)"
@@ -116,8 +129,9 @@ if [ $scriptAction == 'UNINSTALL' ] ; then
     echo Removing files
     rm -rf /usr/local/etc/tinc 
     rm /usr/local/sbin/tincd 
-    rm ${TARGETHOME}/start_net.sh 
+    rm ${TARGETHOME}/start.sh 
     rm ${TARGETHOME}/$FILE
+    rm ${TARGETHOME}/$NET
 
     echo Removing startup command
     rm $RClocal
@@ -127,9 +141,9 @@ if [ $scriptAction == 'UNINSTALL' ] ; then
 fi
 
 # Not sure we need this, must test install vs reinstall, maybe same proc works.  JK 20230505
-if [ $scriptAction == 'REINSTALL' ] ; then
-    rebootNeeded=false
-fi
+#if [ "$scriptAction" == "REINSTALL" ] ; then
+#    rebootNeeded=false
+#fi
 
 # thats all folks - SCRIPT EXITS INSIDE THE FUNCTION
 endScript
