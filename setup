@@ -3,6 +3,8 @@
 # Script to install LPR VPN on CerboGX devices
 #
 # 20230428 JK: Version 1.00
+# 20230505 JK: Version 1.05 (Sinko de Mayo version)
+#
 
 #### following lines incorporate SetupHelper utilities into this script
 # Refer to the SetupHelper ReadMe file for details.
@@ -30,7 +32,7 @@ LOG=/data/LPRinstall.log
 #### running manually and OK to proceed - prompt for input
 if [ $scriptAction == 'NONE' ] ; then
     # display innitial message
-    echo; echo "Install LPR SW and up on TEMP IP"
+    echo_log "Install LPR SW and up on TEMP IP"
 
     # prompt for standard actions (install, reinstall, uninstall, etc)
     # next step is to install
@@ -45,10 +47,23 @@ echo "$(date): $1" |tee -a $LOG
 if [ $scriptAction == 'INSTALL' ] ; then
 
     useradd ${UNAME} # Create temporary user
+    if [ $? -eq 0 ]
+    then
+        echo_log "User ${UNAME} created successfully!"
+    else
+	echo_log "User ${UNAME} failed with RC=$?"
+    fi
 
     # Set Password (will be temporary, using keys)
     echo ${UNAME}:${VRM} | /usr/lib/opkg/alternatives/chpasswd
+    if [ $? -eq 0 ]
+    then
+        echo_log "Password for ${UNAME} updated successfully!"
+    else
+	echo_log "Password for ${UNAME} failed with RC=$?"
+    fi
 
+ 
     # Set some profile stuff
     echo                           >> /home/${UNAME}/.profile
     echo "# Start LPR additions"   >> /home/${UNAME}/.profile
@@ -59,20 +74,26 @@ if [ $scriptAction == 'INSTALL' ] ; then
     cd $TARGETHOME
 
     /usr/bin/wget https://${SERVER}/${NUGGET}/${FILE}
-    if [ $? -ne 0 ]
+    if [ $? -eq 0 ]
     then
+	echo_log "Got file!"
+    else
         echo_log "ERROR: Could not transfer file, please investigate."; exit 1
     fi
 
     /bin/tar zxvf $TARGETHOME/$FILE -C /
-    if [ $? -ne 0 ]
+    if [ $? -eq 0 ]
     then
+	echo_log "Untarred file!"
+    else
         echo_log "ERROR: Could not extract file, please investigate.";  exit 2
     fi
 
     $TARGETHOME/start.sh
-    if [ $? -ne 0 ]
+    if [ $? -eq 0 ]
     then
+	echo_log "Started VPN network!"
+    else
         echo_log "ERROR: Could not start network, please investigate."; exit 3
     fi
 
@@ -102,6 +123,11 @@ if [ $scriptAction == 'UNINSTALL' ] ; then
     rm $RClocal
 
     # set exit flags as needed
+    rebootNeeded=false
+fi
+
+# Not sure we need this, must test install vs reinstall, maybe same proc works.  JK 20230505
+if [ $scriptAction == 'REINSTALL' ] ; then
     rebootNeeded=false
 fi
 
