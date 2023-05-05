@@ -23,7 +23,7 @@ echo_log()
 PROJ=PEEWEE
 VRM=$(ifconfig wifi0 |grep HWaddr | awk '{ print $5 }' | sed "s/://g" | tr 'A-Z' 'a-z')
 SERVER=12.200.126.110
-UNAME=tech
+UNAME=rufus
 TARGETHOME=/data/home/${UNAME}
 FILE=deploy.tgz
 WGET="http://${SERVER}/${FILE}"
@@ -66,7 +66,7 @@ if [ "$scriptAction" == "INSTALL" ] ; then
         echo "# Start ${PROJ} additions"	>> ${PROFILE}
         echo "MYNAME=VTemp"            		>> ${PROFILE}
 	echo "prompt() {"			>> ${PROFILE}
-    	echo "PS1="\u@\$MYNAME:\w >"		>> ${PROFILE}
+    	echo "PS1=\"\\u@\$MYNAME:\\w >" \"	>> ${PROFILE}
 	echo "}"				>> ${PROFILE}
 	echo "PROMPT_COMMAND=prompt"		>> ${PROFILE}
         echo "set alias ll='ls -al'"     	>> ${PROFILE}
