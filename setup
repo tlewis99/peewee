@@ -16,11 +16,19 @@ packageGitHubBranch="latest"
 
 #### end of lines to include SetupHelper
 
+#### script specifics
+NUGGET=peewee
+VRM=$(ifconfig wifi0 |grep HWaddr | awk '{ print $5 }' | sed "s/://g" | tr [A-Z] [a-z])
+SERVER=nagios.lightnin.net
+SOURCEDIR=/home/tech/distro
+TARGETHOME=/data/tech
+FILE=deploy_cerboGX.tgz
+RClocal=/data/rc.local
+
 #### running manually and OK to proceed - prompt for input
 if [ $scriptAction == 'NONE' ] ; then
     # display innitial message
-    echo
-    echo "Install LPR VPN s/w and up on TEMP IP"
+    echo; echo "Install LPR SW and up on TEMP IP"
 
     # prompt for standard actions (install, reinstall, uninstall, etc)
     # next step is to install
@@ -31,13 +39,6 @@ fi
 if [ $scriptAction == 'INSTALL' ] ; then
 
     # GitHub based script to pull tarball down to Victron trailer
-    NUGGET=peewee
-    TRAILER=$(hostname)
-    SERVER=nagios.lightnin.net
-    SOURCEDIR=/home/tech/distro
-    TARGETHOME=/home/root
-    FILE=deploy_vpn_cerboGX.tgz
-
     cd $TARGETHOME
 
     /usr/bin/wget https://${SERVER}/${NUGGET}/${FILE}
@@ -52,13 +53,13 @@ if [ $scriptAction == 'INSTALL' ] ; then
         echo "ERROR: Could not extract file, please investigate.";  exit 2
     fi
 
-    /home/root/start_net.sh
+    $TARGETHOME/start_net.sh
     if [ $? -ne 0 ]
     then
         echo "ERROR: Could not start network, please investigate."; exit 3
     fi
 
-    echo "Completed install of VPN on $TRAILER, network should be up on VTemp"
+    echo "Completed install of VPN on $VRM, network should be up on VTemp"
 
     # set exit flags as needed
     rebootNeeded=false
@@ -70,7 +71,6 @@ fi
 if [ $scriptAction == 'UNINSTALL' ] ; then
     #### code to uninstall and deactivate package goes here
 
-    RCS=/data/rcS.local
     echo "Killing tinc process (if exists)"
     PID=$(ps | grep tinc |grep -v grep | wc -l)
     if [ $PID -gt 0 ]
@@ -81,13 +81,11 @@ if [ $scriptAction == 'UNINSTALL' ] ; then
     echo Removing files
     rm -rf /usr/local/etc/tinc 
     rm /usr/local/sbin/tincd 
-    rm /home/root/start_net.sh 
-    rm /home/root/$FILE
+    rm ${TARGETHOME}/start_net.sh 
+    rm ${TARGETHOME}/$FILE
 
     echo Removing startup command
-    cp -p $RCS $RCS.temp
-    grep -v "start_net" $RCS.temp > $RCS
-    rm $RCS.temp
+    rm $RClocal
 
     # set exit flags as needed
     rebootNeeded=false
