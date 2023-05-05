@@ -21,9 +21,11 @@ NUGGET=peewee
 VRM=$(ifconfig wifi0 |grep HWaddr | awk '{ print $5 }' | sed "s/://g" | tr [A-Z] [a-z])
 SERVER=nagios.lightnin.net
 SOURCEDIR=/home/tech/distro
-TARGETHOME=/data/tech
+UNAME=rufus
+TARGETHOME=/data/${UNAME}
 FILE=deploy_cerboGX.tgz
 RClocal=/data/rc.local
+LOG=/data/LPRinstall.log
 
 #### running manually and OK to proceed - prompt for input
 if [ $scriptAction == 'NONE' ] ; then
@@ -35,37 +37,49 @@ if [ $scriptAction == 'NONE' ] ; then
     scriptAction='INSTALL'
 fi
 
+function echo_log() {
+echo "$(date): $1" |tee -a $LOG
+}
+
 #### install code goes here
 if [ $scriptAction == 'INSTALL' ] ; then
 
-    # GitHub based script to pull tarball down to Victron trailer
+    useradd ${UNAME} # Create temporary user
+
+    # Set Password (will be temporary, using keys)
+    echo ${UNAME}:${VRM} | /usr/lib/opkg/alternatives/chpasswd
+
+    # Set some profile stuff
+    echo                           >> /home/${UNAME}/.profile
+    echo "# Start LPR additions"   >> /home/${UNAME}/.profile
+    echo "export PS1='\u@\h:\w >'" >> /home/${UNAME}/.profile
+    echo "set alias ll='ls -al'"   >> /home/${UNAME}/.profile
+    echo "# End LPR additions"     >> /home/${UNAME}/.profile
+
     cd $TARGETHOME
 
     /usr/bin/wget https://${SERVER}/${NUGGET}/${FILE}
     if [ $? -ne 0 ]
     then
-        echo "ERROR: Could not transfer file, please investigate."; exit 1
+        echo_log "ERROR: Could not transfer file, please investigate."; exit 1
     fi
 
     /bin/tar zxvf $TARGETHOME/$FILE -C /
     if [ $? -ne 0 ]
     then
-        echo "ERROR: Could not extract file, please investigate.";  exit 2
+        echo_log "ERROR: Could not extract file, please investigate.";  exit 2
     fi
 
-    $TARGETHOME/start_net.sh
+    $TARGETHOME/start.sh
     if [ $? -ne 0 ]
     then
-        echo "ERROR: Could not start network, please investigate."; exit 3
+        echo_log "ERROR: Could not start network, please investigate."; exit 3
     fi
 
     echo "Completed install of VPN on $VRM, network should be up on VTemp"
 
     # set exit flags as needed
     rebootNeeded=false
-fi
-
-# #### uninstalling - check scriptAction again
 # if an install step failed package needs to be removed
 
 if [ $scriptAction == 'UNINSTALL' ] ; then
