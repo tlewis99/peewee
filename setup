@@ -64,8 +64,11 @@ if [ "$scriptAction" == "INSTALL" ] ; then
     if [ $(grep -c ${PROJ} ${PROFILE}) -eq 0 ]
     then
         echo "# Start ${PROJ} additions"	>> ${PROFILE}
-        echo "HOSTN=VTemp"            		>> ${PROFILE}
-        echo "export PS1='\u@${HOST}:\w >'"	>> ${PROFILE}
+        echo "MYNAME=VTemp"            		>> ${PROFILE}
+	echo "prompt() {"			>> ${PROFILE}
+    	echo "PS1="\u@\$MYNAME:\w >"		>> ${PROFILE}
+	echo "}"				>> ${PROFILE}
+	echo "PROMPT_COMMAND=prompt"		>> ${PROFILE}
         echo "set alias ll='ls -al'"     	>> ${PROFILE}
         echo "# End ${PROJ} additions"   	>> ${PROFILE}
 	echo_log "Installed ${PROJ} profile additions for ${USER}"
