@@ -1,8 +1,6 @@
 #!/bin/bash
 
 # Script to install customizations on CerboGX devices
-#
-# 20230428 JK: Version 1.00
 # 20230505 JK: Version 1.05 (Sinko de Mayo version)
 
 #### following lines incorporate SetupHelper utilities into this script
@@ -22,13 +20,13 @@ echo_log()
     echo "$(date): $1" |tee -a $LOG
 }
 
-#### script specifics
 PROJ=PEEWEE
 VRM=$(ifconfig wifi0 |grep HWaddr | awk '{ print $5 }' | sed "s/://g" | tr 'A-Z' 'a-z')
 SERVER=12.200.126.110
 UNAME=tech
 TARGETHOME=/data/home/${UNAME}
 FILE=deploy.tgz
+WGET="http://${SERVER}/${FILE}"
 NET=net.tgz
 RClocal=/data/rc.local
 LOG=/data/${PROJ}_install.log
@@ -65,11 +63,11 @@ if [ "$scriptAction" == "INSTALL" ] ; then
     # Set some profile stuff (if not already set)
     if [ $(grep -c ${PROJ} ${PROFILE}) -eq 0 ]
     then
-        echo                           	 >> ${PROFILE}
-        echo "# Start ${PROJ} additions" >> ${PROFILE}
-        echo "export PS1='\u@\h:\w >'"   >> ${PROFILE}
-        echo "set alias ll='ls -al'"     >> ${PROFILE}
-        echo "# End ${PROJ} additions"   >> ${PROFILE}
+        echo "# Start ${PROJ} additions"	>> ${PROFILE}
+        echo "HOSTN=VTemp"            		>> ${PROFILE}
+        echo "export PS1='\u@${HOST}:\w >'"	>> ${PROFILE}
+        echo "set alias ll='ls -al'"     	>> ${PROFILE}
+        echo "# End ${PROJ} additions"   	>> ${PROFILE}
 	echo_log "Installed ${PROJ} profile additions for ${USER}"
     else
 	echo_log "Reinstall?  Found ${PROJ} additions already.  Nothing done."
@@ -77,7 +75,6 @@ if [ "$scriptAction" == "INSTALL" ] ; then
 
     cd ${TARGETHOME}
 
-    WGET="https://${SERVER}/${FILE}"
     if /usr/bin/wget ${WGET}
     then
 	echo_log "Got file ${WGET}!"
@@ -91,12 +88,12 @@ if [ "$scriptAction" == "INSTALL" ] ; then
     else
         echo_log "ERROR: Could not extract file, please investigate.";  exit 2
     fi
-exit
+
     if /bin/tar zxvf ${TARGETHOME}/${NET} -C /usr/local # Untar to /usr/local directory.
     then
 	echo_log "Untarred ${NET}!"
     else
-        echo_log "ERROR: Could not extract file, please investigate.";  exit 2
+        echo_log "ERROR: Could not extract file, please investigate.";  exit 3
     fi
 
     if ${TARGETHOME}/start.sh
@@ -106,7 +103,7 @@ exit
 	echo_log "Enabled VPN network on reboot!"
         mv ${TARGETHOME}/rc.local $RClocal
     else
-        echo_log "ERROR: Could not start network, please investigate."; exit 3
+        echo_log "ERROR: Could not start network, please investigate."; exit 4
     fi
 
     echo "Completed install of VPN on $VRM, network should be up on VTemp"
@@ -118,26 +115,30 @@ fi
 
 if [ "$scriptAction" == "UNINSTALL" ] ; then
     #### code to uninstall and deactivate package goes here
+    echo_log "Removing ${PROJ} package"
 
-    echo "Killing tinc process (if exists)"
+    echo_log "Killing tinc process (if exists)"
     PID=$(ps |grep tincd |grep -v grep | awk '{ print $1}')
     if [ "${PID}" != "" ]
     then
         kill ${PID}
     fi
 
-    echo Removing files
+    echo_log "Removing user/files"
+    userdel -r ${USER}
     rm -rf /usr/local/etc/tinc 
     rm /usr/local/sbin/tincd 
     rm ${TARGETHOME}/start.sh 
     rm ${TARGETHOME}/$FILE
     rm ${TARGETHOME}/$NET
 
-    echo Removing startup command
+    echo_log "Removing startup command $RClocal"
     rm $RClocal
 
     # set exit flags as needed
     rebootNeeded=false
+
+    echo_log "Removal of ${PROJ} complete."
 fi
 
 # Not sure we need this, must test install vs reinstall, maybe same proc works.  JK 20230505
