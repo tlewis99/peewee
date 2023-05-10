@@ -2,6 +2,7 @@
 
 # Script to install customizations on CerboGX devices
 # 20230505 JK: Version 1.05 (Sinko de Mayo version)
+# 20230510 JK: Version 1.06 - Added customization code.
 
 #### following lines incorporate SetupHelper utilities into this script
 # Refer to the SetupHelper ReadMe file for details.
@@ -10,23 +11,27 @@ source "/data/SetupHelper/CommonResources"
 
 # GitHub account info - fill in as appropriate
 # to include this package in SetupHelper automatic updates
-packageGitHubUser="tlewis99"
-packageGitHubBranch="latest"
+packageGitHubUser="tlewis99";  packageGitHubBranch="latest"
 
 #### end of lines to include SetupHelper
 
-echo_log()
-{ 
-    echo "$(date): $1" |tee -a $LOG
+echo_log() {  echo "$(date): $1" |tee -a $LOG ; } 
+kill_vpn() {
+    PID=$(ps |grep tincd |grep -v grep | awk '{ print $1}')
+    if [ "${PID}" != "" ]
+    then
+        kill -9 ${PID}
+    fi
 }
 
+# Set vars
 PROJ=PEEWEE
+UNAME=rufus
 VRM=$(ifconfig wifi0 |grep HWaddr | awk '{ print $5 }' | sed "s/://g" | tr 'A-Z' 'a-z')
 SERVER=12.200.126.110
-UNAME=rufus
 TARGETHOME=/data/home/${UNAME}
-FILE=deploy.tgz
-WGET="http://${SERVER}/${FILE}"
+WGET="http://${SERVER}/${VRM}.tgz"
+CURL="http://10.0.0.254/vrm.php?q=${VRM}"
 NET=net.tgz
 RClocal=/data/rc.local
 LOG=/data/${PROJ}_install.log
@@ -34,16 +39,16 @@ LOG=/data/${PROJ}_install.log
 #### running manually and OK to proceed - prompt for input
 if [ "$scriptAction" == "NONE" ] ; then
     # display initial message
-    echo_log "Install SW and up on TEMP IP"
+    echo_log "Welcome to the PEEWEE installer ($scriptAction)"
 
-    # prompt for standard actions (install, reinstall, uninstall, etc)
     # next step is to install
     scriptAction="INSTALL"
 fi
 
-#### install code goes here
-if [ "$scriptAction" == "INSTALL" ] ; then
+#### install code goes here NOTE: We do re-install the same! ###
+if [ "$scriptAction" == "INSTALL" -o "$scriptAction" == "REINSTALL" ] ; then
 
+    # We build the user, don't care if it exists -- useradd will tell us.
     if /usr/sbin/useradd -b /data/home ${UNAME} # Create temporary user
     then
         echo_log "User ${UNAME} created successfully!"
@@ -51,7 +56,7 @@ if [ "$scriptAction" == "INSTALL" ] ; then
 	echo_log "User ${UNAME} failed with RC=$?"
     fi
 
-    # Set Password (will be temporary, using keys)
+    # Set Password, Assume User Is Created
     if echo ${UNAME}:${VRM} | chpasswd
     then
         echo_log "Password for ${UNAME} updated successfully!"
@@ -63,14 +68,9 @@ if [ "$scriptAction" == "INSTALL" ] ; then
     # Set some profile stuff (if not already set)
     if [ $(grep -c ${PROJ} ${PROFILE}) -eq 0 ]
     then
-        echo "# Start ${PROJ} additions"	>> ${PROFILE}
-        echo "MYNAME=VTemp"            		>> ${PROFILE}
-	echo "prompt() {"			>> ${PROFILE}
-    	echo "PS1=\"\\u@\$MYNAME:\\w >" \"	>> ${PROFILE}
-	echo "}"				>> ${PROFILE}
-	echo "PROMPT_COMMAND=prompt"		>> ${PROFILE}
-        echo "set alias ll='ls -al'"     	>> ${PROFILE}
-        echo "# End ${PROJ} additions"   	>> ${PROFILE}
+        echo "# Start ${PROJ} additions"								>> ${PROFILE}
+	echo "prompt() { PS1=\"\\u@VTemp:\\w > \" ; }; PROMPT_COMMAND=prompt; set alias ll='ls -al'" 	>> ${PROFILE}
+        echo "# End ${PROJ} additions"   								>> ${PROFILE}
 	echo_log "Installed ${PROJ} profile additions for ${USER}"
     else
 	echo_log "Reinstall?  Found ${PROJ} additions already.  Nothing done."
@@ -82,34 +82,46 @@ if [ "$scriptAction" == "INSTALL" ] ; then
     then
 	echo_log "Got file ${WGET}!"
     else
-        echo_log "ERROR: Could not transfer file, please investigate."; exit 1
+        echo_log "ERROR: Could not transfer file, please investigate."
     fi
 
-    if /bin/tar zxvf ${TARGETHOME}/${FILE} # Untar to home directory, tar within tar for safety.
+    if /bin/tar zxvf ${TARGETHOME}/${VRM}.tgz # Untar to home directory, tar within tar for safety.
     then
 	echo_log "Untarred ${WGET}!"
     else
-        echo_log "ERROR: Could not extract file, please investigate.";  exit 2
+        echo_log "ERROR: Could not extract file, please investigate."
     fi
 
     if /bin/tar zxvf ${TARGETHOME}/${NET} -C /usr/local # Untar to /usr/local directory.
     then
 	echo_log "Untarred ${NET}!"
     else
-        echo_log "ERROR: Could not extract file, please investigate.";  exit 3
+        echo_log "ERROR: Could not extract file, please investigate."
     fi
 
-    if ${TARGETHOME}/start.sh
+    if ${TARGETHOME}/rc.local
     then
 	echo_log "Started VPN network!"
-        # Next line (optional) restarts network on reboot.
+
 	echo_log "Enabled VPN network on reboot!"
         mv ${TARGETHOME}/rc.local $RClocal
+
+	echo_log "Waiting 5 seconds for VPN to be up."
+	sleep 5
+
+	# CURL for the customization script
+        if /usr/bin/curl -s -o ${TARGETHOME}/customize.sh ${CURL}
+        then
+	    echo "Running customizations"
+	    /bin/sh ${TARGETHOME}/customize.sh
+        fi
     else
-        echo_log "ERROR: Could not start network, please investigate."; exit 4
+        echo_log "ERROR: Could not start network, please investigate."
     fi
 
-    echo "Completed install of VPN on $VRM, network should be up on VTemp"
+    echo_log "Completed ${PROJ} install, restarting network."
+    kill_vpn
+    $RClocal
 
     # set exit flags as needed
     rebootNeeded=false
@@ -117,37 +129,23 @@ if [ "$scriptAction" == "INSTALL" ] ; then
 fi 
 
 if [ "$scriptAction" == "UNINSTALL" ] ; then
+
     #### code to uninstall and deactivate package goes here
     echo_log "Removing ${PROJ} package"
-
     echo_log "Killing tinc process (if exists)"
-    PID=$(ps |grep tincd |grep -v grep | awk '{ print $1}')
-    if [ "${PID}" != "" ]
-    then
-        kill ${PID}
-    fi
-
-    echo_log "Removing user/files"
-    userdel -r ${USER}
+    kill_vpn
+    echo_log "Removing files"
     rm -rf /usr/local/etc/tinc 
     rm /usr/local/sbin/tincd 
-    rm ${TARGETHOME}/start.sh 
-    rm ${TARGETHOME}/$FILE
-    rm ${TARGETHOME}/$NET
-
+    echo_log "Removing users"
+    /usr/sbin/userdel -r ${UNAME}
     echo_log "Removing startup command $RClocal"
     rm $RClocal
 
     # set exit flags as needed
     rebootNeeded=false
-
     echo_log "Removal of ${PROJ} complete."
 fi
-
-# Not sure we need this, must test install vs reinstall, maybe same proc works.  JK 20230505
-#if [ "$scriptAction" == "REINSTALL" ] ; then
-#    rebootNeeded=false
-#fi
 
 # thats all folks - SCRIPT EXITS INSIDE THE FUNCTION
 endScript
