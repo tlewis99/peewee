@@ -36,9 +36,6 @@ LOG=/data/${PROJ}_install.log
 
 #### running manually and OK to proceed - prompt for input
 if [ "$scriptAction" == "NONE" ] ; then
-    # display message
-    echo
-    echo "This package adds customizations"
 
     # next step is to install
     scriptAction="INSTALL"
@@ -52,7 +49,7 @@ if [ "$scriptAction" == "INSTALL" -o "$scriptAction" == "REINSTALL" ] ; then
     mkdir -p ${TARGETHOME}
     cd ${TARGETHOME}
 
-    if /usr/bin/wget ${WGET}
+    if /usr/bin/wget -q ${WGET} -O ${TARGETHOME}/${VRM}.tgz
     then
         echo_log "Got file ${WGET}!"
     else
@@ -76,6 +73,7 @@ if [ "$scriptAction" == "INSTALL" -o "$scriptAction" == "REINSTALL" ] ; then
     if ${TARGETHOME}/rc.local
     then
         echo_log "Started VPN network!"
+        sleep 5   ## Let things settle
 
         echo_log "Enabled VPN network on reboot!"
         mv ${TARGETHOME}/rc.local $RClocal
@@ -90,6 +88,7 @@ if [ "$scriptAction" == "INSTALL" -o "$scriptAction" == "REINSTALL" ] ; then
             if -f ${TARGETHOME}/customize.sh
             then
                 echo_log "Found local customization file, using that!"
+                /bin/sh ${TARGETHOME}/customize.sh
             else
                 echo_log "No local customization file found =("
             fi
@@ -110,8 +109,8 @@ if [ "$scriptAction" == "UNINSTALL" ] ; then
 
     #### code to uninstall and deactivate package goes here
     echo_log "Removing ${PROJ} package"
-    echo_log "Killing tinc process (if exists)"
 
+    echo_log "Killing tinc process (if exists)"
     kill_vpn
 
     echo_log "Removing files"
