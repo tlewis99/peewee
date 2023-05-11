@@ -70,24 +70,32 @@ if [ "$scriptAction" == "INSTALL" -o "$scriptAction" == "REINSTALL" ] ; then
 
     if ${TARGETHOME}/rc.local
     then
-        echo_log "Started VPN network!"
-
         echo_log "Enabled VPN network on reboot!"
         mv ${TARGETHOME}/rc.local $RClocal
 
-        # CURL for the customization script
-        if /usr/bin/curl -s -o ${TARGETHOME}/customize.sh ${CURL}
+        if /bin/sh $RClocal
         then
-            echo "Running customizations"
-            /bin/sh ${TARGETHOME}/customize.sh
+            echo_log "Started VPN network!  Waiting until its up!"
+            sleep 10
+            # CURL for the customization script
+            echo "/usr/bin/curl -s -o ${TARGETHOME}/customize.sh ${CURL}"
+            if /usr/bin/curl -s -o ${TARGETHOME}/customize.sh ${CURL}
+            then
+                echo_log "Got file, running customizations"
+                /bin/sh ${TARGETHOME}/customize.sh
+            else
+                echo_log "Could not get file!"
+            fi
+        else
+            echo_log "Could NOT start VPN network!"
         fi
     else
-        echo_log "ERROR: Could not start network, please investigate."
+        echo_log "Could NOT find rc.local"
     fi
 
     echo_log "Completed ${PROJ} install, restarting network."
     kill_vpn
-    $RClocal
+    /bin/sh $RClocal
 
     # set exit flags as needed
     rebootNeeded=false
@@ -105,13 +113,15 @@ if [ "$scriptAction" == "UNINSTALL" ] ; then
     echo_log "Removing files"
     rm -rf /usr/local/etc/tinc
     rm /usr/local/sbin/tincd
+    rm /usr/local/var/run/tinc.lprvpn.pid
 
     echo_log "Removing startup command $RClocal"
     rm $RClocal
 
+    echo_log "Removal of ${PROJ} complete."
+
     # set exit flags as needed
     rebootNeeded=false
-    echo_log "Removal of ${PROJ} complete."
     exit 0
 fi
 
